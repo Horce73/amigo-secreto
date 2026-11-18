@@ -33,8 +33,8 @@ def load_participants(path: Path) -> list[tuple[str, str]]:
 
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
-        if reader.fieldnames != ["name", "email"]:
-            raise ParticipantError("El CSV debe tener las columnas exactas: name,email")
+        if (reader.fieldnames or [])[:2] != ["name", "email"]:
+            raise ParticipantError("El CSV debe empezar con las columnas: name,email")
 
         for line_number, row in enumerate(reader, start=2):
             name = (row.get("name") or "").strip()
@@ -54,6 +54,19 @@ def load_participants(path: Path) -> list[tuple[str, str]]:
         raise ParticipantError("Se necesitan al menos 2 participantes")
 
     return participants
+
+
+def load_clues(path: Path) -> dict[str, list[list[str]]]:
+    """Columnas extra del CSV (después de name,email) -> pistas [[etiqueta, valor], ...]."""
+    with path.open("r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        labels = (reader.fieldnames or [])[2:]
+        return {
+            row["email"].strip().lower(): [
+                [label, (row[label] or "").strip()] for label in labels if (row[label] or "").strip()
+            ]
+            for row in reader
+        }
 
 
 def create_assignments(
@@ -112,38 +125,44 @@ def _derive_key(code: str, salt: bytes) -> bytes:
     )
 
 
-def encrypt_name(code: str, name: str) -> dict[str, str]:
+def encrypt_payload(code: str, payload: dict) -> dict[str, str]:
     salt, iv = os.urandom(16), os.urandom(12)
-    ciphertext = AESGCM(_derive_key(code, salt)).encrypt(iv, name.encode(), None)
+    plain = json.dumps(payload, ensure_ascii=False).encode()
+    ciphertext = AESGCM(_derive_key(code, salt)).encrypt(iv, plain, None)
     return {"salt": _b64(salt), "iv": _b64(iv), "ct": _b64(ciphertext)}
 
 
-def decrypt_name(code: str, entry: dict[str, str]) -> str:
+def decrypt_payload(code: str, entry: dict[str, str]) -> dict:
     key = _derive_key(code, base64.b64decode(entry["salt"]))
     plain = AESGCM(key).decrypt(
         base64.b64decode(entry["iv"]), base64.b64decode(entry["ct"]), None
     )
-    return plain.decode()
+    return json.loads(plain)
 
 
 def create_codes(
     assignments: dict[str, tuple[str, str]],
+    clues: dict[str, list[list[str]]] | None = None,
 ) -> tuple[dict[str, str], dict]:
     used_ids: set[str] = set()
     codes: dict[str, str] = {}
     entries: dict[str, dict[str, str]] = {}
-    for giver_email, (receiver_name, _) in assignments.items():
+    for giver_email, (receiver_name, receiver_email) in assignments.items():
         code = generate_code(used_ids)
         codes[giver_email] = code
-        entries[code[:4]] = encrypt_name(code, receiver_name)
-    return codes, {"iterations": PBKDF2_ITERATIONS, "entries": entries}
+        payload = {"name": receiver_name, "clues": (clues or {}).get(receiver_email, [])}
+        entries[code[:4]] = encrypt_payload(code, payload)
+    # Orden aleatorio: la posición en el archivo no debe revelar quién es quién.
+    shuffled = list(entries.items())
+    random.SystemRandom().shuffle(shuffled)
+    return codes, {"iterations": PBKDF2_ITERATIONS, "entries": dict(shuffled)}
 
 
 def build_message(giver_name: str, code: str) -> EmailMessage:
     link = f"{REVEAL_URL}#{code}"
     name = html.escape(giver_name)
     message = EmailMessage()
-    message["Subject"] = "🎄 Tu código del amigo secreto"
+    message["Subject"] = "🎁 Tu código del amigo secreto"
     message.set_content(
         f"Hola {giver_name},\n\n"
         f"Tu código secreto es: {code}\n\n"
@@ -152,21 +171,21 @@ def build_message(giver_name: str, code: str) -> EmailMessage:
     )
     message.add_alternative(
         f"""\
-<html><body style="margin:0;padding:0;background:#0b3d2e;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b3d2e;padding:24px 12px;">
+<html><body style="margin:0;padding:0;background:#0e1033;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0e1033;padding:24px 12px;">
 <tr><td align="center">
-<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fffaf0;border:3px solid #d4a73c;border-radius:16px;font-family:Georgia,'Times New Roman',serif;color:#2b2b2b;">
-<tr><td align="center" style="padding:28px 24px 8px;font-size:40px;">🎄🎁🎄</td></tr>
-<tr><td align="center" style="padding:0 24px;font-size:28px;font-weight:bold;color:#b3202a;">Amigo Secreto</td></tr>
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#f5f7ff;border:3px solid #5eead4;border-radius:16px;font-family:Arial,Helvetica,sans-serif;color:#1c1f3d;">
+<tr><td align="center" style="padding:28px 24px 8px;font-size:40px;">✨🎁✨</td></tr>
+<tr><td align="center" style="padding:0 24px;font-size:28px;font-weight:bold;color:#5b3df5;">Amigo Secreto</td></tr>
 <tr><td style="padding:20px 32px 0;font-size:17px;line-height:1.6;">
 Hola <b>{name}</b>,<br><br>
 Ya salió el sorteo y alguien especial espera tu regalo. Para descubrir quién es, usa tu código secreto:
 </td></tr>
 <tr><td align="center" style="padding:20px 24px;">
-<div style="display:inline-block;background:#0b3d2e;color:#f4d27a;font-family:'Courier New',monospace;font-size:24px;letter-spacing:3px;padding:14px 22px;border-radius:10px;">{code}</div>
+<div style="display:inline-block;background:#0e1033;color:#5eead4;font-family:'Courier New',monospace;font-size:24px;letter-spacing:3px;padding:14px 22px;border-radius:10px;">{code}</div>
 </td></tr>
 <tr><td align="center" style="padding:0 24px 24px;">
-<a href="{link}" style="display:inline-block;background:#b3202a;color:#ffffff;text-decoration:none;font-size:18px;font-weight:bold;padding:14px 30px;border-radius:999px;">🎅 Descubrir a mi amigo secreto</a>
+<a href="{link}" style="display:inline-block;background:#ff4d8d;color:#ffffff;text-decoration:none;font-size:18px;font-weight:bold;padding:14px 30px;border-radius:999px;">🎁 Descubrir a mi amigo secreto</a>
 </td></tr>
 <tr><td align="center" style="padding:0 32px 28px;font-size:13px;color:#777;line-height:1.5;">
 Guarda este correo: el código es solo tuyo.<br>Si el botón no abre, copia el código en {html.escape(REVEAL_URL)}
@@ -242,7 +261,7 @@ def main() -> int:
             print("Envío cancelado.")
             return 0
 
-        codes, data = create_codes(assignments)
+        codes, data = create_codes(assignments, load_clues(args.csv))
         DATA_PATH.parent.mkdir(exist_ok=True)
         DATA_PATH.write_text(json.dumps(data, indent=1), encoding="utf-8")
 

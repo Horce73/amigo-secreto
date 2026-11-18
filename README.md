@@ -17,8 +17,10 @@ python3 -m venv .venv
 1. Copia `participants.example.csv` a `participants.csv`.
 2. Reemplaza los datos por los participantes reales.
 3. Usa correos únicos por persona.
+4. Las columnas después de `name,email` son pistas opcionales: aparecen en la carta antes de revelar
+   el nombre (el título de la columna es la etiqueta). Los valores vacíos se omiten.
 
-El CSV debe tener exactamente estas columnas:
+El CSV debe empezar con estas columnas (puede tener más a la derecha):
 
 ```csv
 name,email

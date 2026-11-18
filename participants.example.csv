@@ -1,5 +1,5 @@
-name,email
-Ana,ana@example.com
-Bruno,bruno@example.com
-Carla,carla@example.com
-Diego,diego@example.com
+name,email,Hobby,Comida favorita,Ciudad,Frase
+Ana,ana@example.com,Dibujar,Pizza,La Paz,Siempre llega tarde
+Bruno,bruno@example.com,Videojuegos,Sushi,Santa Cruz,
+Carla,carla@example.com,Correr,Tacos,Cochabamba,Madruga para todo
+Diego,diego@example.com,,Empanadas,Sucre,Cuenta chistes malos
