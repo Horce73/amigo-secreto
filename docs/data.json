@@ -1,0 +1,20 @@
+{
+ "iterations": 600000,
+ "entries": {
+  "RLPF": {
+   "salt": "T98IFhWd6ggQGEsxsmDyIw==",
+   "iv": "FwCWLqLmTYtw3T+b",
+   "ct": "hZONpX/RHzWHCfE1FRiVbEvhW7A="
+  },
+  "N8LP": {
+   "salt": "R0MDauK+xx7c5CJoAAfdnQ==",
+   "iv": "IV/TESDqtUJ43Z+A",
+   "ct": "Bz1m62YClMEasQf/w0YTjfTr9Opv64Y="
+  },
+  "WVZR": {
+   "salt": "fan56uWsjGX1p59/ZIaf3g==",
+   "iv": "A2IWBNzo/ZgjmXTx",
+   "ct": "moJIcdIvHT+/eGm8It5hTCVancH3/w=="
+  }
+ }
+}

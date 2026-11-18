@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Amigo Secreto 🎄</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="snow" aria-hidden="true"></div>
+  <main>
+    <h1>🎄 Amigo Secreto</h1>
+
+    <form id="form">
+      <p>Escribe el código que llegó a tu correo.</p>
+      <input id="code" type="text" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="XXXX-XXXXX-XXXXX" aria-label="Código secreto">
+      <button type="submit">🎅 Descubrir</button>
+      <p id="error" role="alert" hidden></p>
+    </form>
+
+    <section id="result" hidden>
+      <div id="gift" aria-hidden="true">🎁</div>
+      <p id="opening">Abriendo tu regalo…</p>
+      <div id="reveal" hidden>
+        <p>Tu amigo secreto es</p>
+        <p id="name"></p>
+        <p class="small">Shhh… ¡guarda el secreto! 🤫</p>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
