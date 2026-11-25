@@ -18,6 +18,24 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+DOTENV_PATH = Path(__file__).parent / ".env"
+
+
+def _load_dotenv(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k and k not in os.environ:
+            os.environ[k] = v
+
+
+_load_dotenv(DOTENV_PATH)
+
 REVEAL_URL = os.environ.get("REVEAL_URL", "https://horce73.github.io/amigo-secreto/")
 DOCS_DIR = Path(__file__).parent / "docs"
 DATA_PATH = DOCS_DIR / "data.json"
@@ -133,22 +151,69 @@ def load_clues(path: Path) -> dict[str, list[str | dict[str, str]]]:
     return clues_by_email
 
 
+def _load_env_fixed_matches() -> dict[str, str]:
+    """Carga restricciones fijas opcionales desde la variable de entorno FIXED_MATCHES."""
+    raw = (os.environ.get("FIXED_MATCHES") or "").strip()
+    if not raw:
+        return {}
+    matches: dict[str, str] = {}
+    for pair in raw.split(","):
+        if ":" in pair:
+            g, r = pair.split(":", 1)
+            if g.strip() and r.strip():
+                matches[g.strip()] = r.strip()
+    return matches
+
+
+DEFAULT_FIXED_MATCHES: dict[str, str] = {}
+
+
 def create_assignments(
-    participants: list[tuple[str, str]], rng: random.Random | None = None
+    participants: list[tuple[str, str]],
+    rng: random.Random | None = None,
+    fixed_matches: dict[str, str] | None = None,
 ) -> dict[str, tuple[str, str]]:
     rng = rng or random.SystemRandom()
     emails = [email for _, email in participants]
+    email_to_name = {email: name for name, email in participants}
+    name_to_email = {name.lower(): email for name, email in participants}
+    email_set = set(emails)
 
-    for _ in range(1000):
+    raw_fixed = (
+        fixed_matches
+        if fixed_matches is not None
+        else (_load_env_fixed_matches() or DEFAULT_FIXED_MATCHES)
+    )
+    normalized_fixed: dict[str, str] = {}
+    for g, r in (raw_fixed or {}).items():
+        g_clean = g.strip().lower()
+        r_clean = r.strip().lower()
+        g_email = g_clean if g_clean in email_set else name_to_email.get(g_clean)
+        r_email = r_clean if r_clean in email_set else name_to_email.get(r_clean)
+        if g_email and r_email:
+            if g_email == r_email:
+                raise ParticipantError(f"Asignación fija no puede ser a sí mismo: {g}")
+            normalized_fixed[g_email] = r_email
+
+    for _ in range(5000):
         receivers = emails.copy()
         rng.shuffle(receivers)
-        if all(giver != receiver for giver, receiver in zip(emails, receivers)):
-            return {
-                giver: (next(name for name, email in participants if email == receiver), receiver)
-                for giver, receiver in zip(emails, receivers)
-            }
+        mapping = dict(zip(emails, receivers))
 
-    raise ParticipantError("No se pudo generar un sorteo válido")
+        # 1. Nadie se regala a sí mismo
+        if any(giver == receiver for giver, receiver in mapping.items()):
+            continue
+
+        # 2. Cumple las asignaciones fijas requeridas
+        if any(mapping.get(g) != r for g, r in normalized_fixed.items()):
+            continue
+
+        return {
+            giver: (email_to_name[receiver], receiver)
+            for giver, receiver in mapping.items()
+        }
+
+    raise ParticipantError("No se pudo generar un sorteo válido con las restricciones especificadas")
 
 
 def validate_assignments(
@@ -389,6 +454,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Mostrar en consola la tabla de emparejamientos (quién le regala a quién) para pruebas",
     )
+    parser.add_argument(
+        "--fix",
+        nargs=2,
+        metavar=("GIVER", "RECEIVER"),
+        help="Fijar un emparejamiento específico (nombre o email)",
+    )
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -422,7 +493,8 @@ def main() -> int:
     try:
         participants = load_participants(args.csv)
         clues = load_clues(args.csv)
-        assignments = create_assignments(participants)
+        fixed_dict = {args.fix[0]: args.fix[1]} if args.fix else None
+        assignments = create_assignments(participants, fixed_matches=fixed_dict)
         validate_assignments(participants, assignments)
 
         # Modo validación en seco
