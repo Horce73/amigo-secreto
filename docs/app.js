@@ -537,15 +537,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --------------------------------------------------------------------------
-  // Detección automática de código en URL Hash (#XXXX-XXXXX-XXXXX)
+  // Detección automática de código en URL Hash (#XXXX-XXXXX-XXXXX) o Query (?code=...)
   // --------------------------------------------------------------------------
-  const initialHash = window.location.hash ? window.location.hash.slice(1) : "";
-  if (initialHash) {
-    const cleanHash = normalizeCode(initialHash);
+  const urlParams = new URLSearchParams(window.location.search);
+  const rawParamCode =
+    urlParams.get("code") ||
+    (window.location.hash ? window.location.hash.slice(1) : "");
+  if (rawParamCode) {
+    const cleanHash = normalizeCode(rawParamCode);
     if (cleanHash) {
       input.value = formatCodeWithDashes(cleanHash);
-      // Limpiar hash de la URL para confidencialidad
-      history.replaceState(null, "", window.location.pathname + window.location.search);
+      // Limpiar hash y parámetros de la URL para confidencialidad
+      history.replaceState(null, "", window.location.pathname);
       performReveal(cleanHash);
     }
   }

@@ -151,6 +151,17 @@ def load_clues(path: Path) -> dict[str, list[str | dict[str, str]]]:
     return clues_by_email
 
 
+def load_existing_codes(report_path: Path = CODES_OUTPUT_FILE) -> dict[str, str]:
+    """Lee los códigos ya generados desde codigos_sorteo.txt si existe."""
+    if not report_path.exists():
+        return {}
+    pattern = r"Participante:\s*(?:.+?)\s*<([^>]+)>\s*\nCódigo:\s*([A-Z0-9-]+)"
+    return {
+        email.strip().lower(): code.strip()
+        for email, code in re.findall(pattern, report_path.read_text(encoding="utf-8"))
+    }
+
+
 def _load_env_fixed_matches() -> dict[str, str]:
     """Carga restricciones fijas opcionales desde la variable de entorno FIXED_MATCHES."""
     raw = (os.environ.get("FIXED_MATCHES") or "").strip()
@@ -461,6 +472,15 @@ def parse_args() -> argparse.Namespace:
         help="Fijar un emparejamiento específico (nombre o email)",
     )
 
+    parser.add_argument(
+        "--yes", "-y", action="store_true", help="Confirmar envío sin preguntar interactivamente"
+    )
+    parser.add_argument(
+        "--regenerate",
+        action="store_true",
+        help="Forzar la regeneración de un nuevo sorteo al enviar por correo",
+    )
+
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--generate",
@@ -569,25 +589,45 @@ def main() -> int:
         print("Se enviarán correos a:")
         for name, email in recipients:
             print(f"  {name} <{email}>")
-        answer = input("¿Confirmas el envío? [sí/no]: ").strip().lower()
-        if answer not in {"sí", "si", "s"}:
-            print("Envío cancelado.")
-            return 0
 
-        codes, data = create_codes(assignments, clues)
-        DOCS_DIR.mkdir(parents=True, exist_ok=True)
-        DATA_PATH.write_text(json.dumps(data, indent=1), encoding="utf-8")
+        if not args.yes:
+            answer = input("¿Confirmas el envío? [sí/no]: ").strip().lower()
+            if answer not in {"sí", "si", "s"}:
+                print("Envío cancelado.")
+                return 0
+
+        existing_codes = load_existing_codes() if not args.regenerate else {}
+        use_existing = False
+        if existing_codes and DATA_PATH.exists():
+            data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+            entries = data.get("entries", {})
+            if all(
+                e in existing_codes
+                and normalize_code(existing_codes[e])[:4] in entries
+                for _, e in recipients
+            ):
+                use_existing = True
+
+        if use_existing:
+            print("Usando los códigos ya guardados en codigos_sorteo.txt (coinciden con docs/data.json).")
+            codes = existing_codes
+        else:
+            print("Generando nuevo sorteo y actualizando docs/data.json...")
+            codes, data = create_codes(assignments, clues)
+            DOCS_DIR.mkdir(parents=True, exist_ok=True)
+            DATA_PATH.write_text(json.dumps(data, indent=1), encoding="utf-8")
+            report = export_codes_report(participants, codes, port=args.port)
+            CODES_OUTPUT_FILE.write_text(report, encoding="utf-8")
 
         try:
             send_codes(participants, {e: codes[e] for _, e in recipients})
         except (OSError, smtplib.SMTPException):
             print(
-                "El envío se interrumpió. Si repites el sorteo, los códigos ya enviados "
-                "dejan de servir: vuelve a enviar a todos.",
+                "El envío se interrumpió.",
                 file=sys.stderr,
             )
             raise
-        print("Listo. Publica docs/data.json en git para que los códigos funcionen en GitHub Pages.")
+        print("Envío de correos completado exitosamente.")
         return 0
     except (ParticipantError, smtplib.SMTPException) as error:
         print(f"Error: {error}", file=sys.stderr)
