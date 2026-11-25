@@ -1,5 +1,5 @@
-name,email,Hobby,Comida favorita,Ciudad,Frase
-Ana,ana@example.com,Dibujar,Pizza,La Paz,Siempre llega tarde
-Bruno,bruno@example.com,Videojuegos,Sushi,Santa Cruz,
-Carla,carla@example.com,Correr,Tacos,Cochabamba,Madruga para todo
-Diego,diego@example.com,,Empanadas,Sucre,Cuenta chistes malos
+name,email,caracteristicas
+Ana,ana@example.com,Dibujar | Siempre llega tarde | Fan del café
+Bruno,bruno@example.com,Videojuegos | Nunca responde mensajes
+Carla,carla@example.com,Correr | Adicta a los tacos
+Diego,diego@example.com,Cuenta chistes malos | Colecciona gorras

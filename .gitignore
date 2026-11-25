@@ -1,6 +1,12 @@
 __pycache__/
 *.py[cod]
 .env
+.env.*
 participants.csv
 assignments.json
+codigos_sorteo.txt
+codigos_*.txt
+*.txt
+!requirements.txt
 .venv/
+preview/

@@ -3,44 +3,116 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex">
-  <title>Amigo Secreto ✨</title>
-  <link rel="stylesheet" href="style.css">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Descubre a tu amigo secreto de forma privada y segura.">
+  <meta name="theme-color" content="#1a0605">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%2378211E%22/><circle cx=%2216%22 cy=%2216%22 r=%228%22 stroke=%22%23D8C8B8%22 stroke-width=%222.5%22 fill=%22none%22/></svg>">
+  <title>Amigo Secreto</title>
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
-  <div id="snow" aria-hidden="true"></div>
-  <div id="burst" aria-hidden="true"></div>
-  <main>
-    <h1>✨ Amigo Secreto</h1>
+  <!-- Fondo ambiental cálido y festivo -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+  <canvas id="stars-canvas" aria-hidden="true"></canvas>
 
-    <form id="form">
-      <p>Escribe el código que llegó a tu correo.</p>
-      <input id="code" type="text" autocomplete="off" autocapitalize="characters"
-             spellcheck="false" placeholder="XXXX-XXXXX-XXXXX" aria-label="Código secreto">
-      <button type="submit">🎁 Descubrir</button>
-      <p id="error" role="alert" hidden></p>
-    </form>
+  <main class="app-container">
+    <header class="app-header">
+      <div class="badge" aria-hidden="true">
+        <span>Intercambio Navideño</span>
+      </div>
+      <h1 class="app-title">Amigo Secreto</h1>
+      <p class="app-subtitle">Ingresa tu código único para revelar a quién te tocó regalar esta Navidad.</p>
+    </header>
 
-    <section id="result" hidden>
-      <div id="gift" aria-hidden="true">🎁</div>
-      <p id="opening">Abriendo tu regalo…</p>
-      <div id="card" hidden>
-        <div class="card-inner">
-          <div class="face front">
-            <p class="tag">⭐ Carta especial ⭐</p>
-            <div class="silhouette" aria-hidden="true">?</div>
-            <ul id="clues" aria-live="polite"></ul>
+    <!-- Tarjeta del formulario de ingreso -->
+    <section class="card" id="form-card" aria-labelledby="form-heading">
+      <h2 id="form-heading" class="sr-only">Formulario para ingresar código</h2>
+
+      <form id="reveal-form" novalidate>
+        <div class="field-group">
+          <label for="code" class="field-label">Código secreto</label>
+          <div class="input-container">
+            <input
+              id="code"
+              name="code"
+              type="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="XXXX-XXXXX-XXXXX"
+              maxlength="16"
+              aria-describedby="code-hint code-error"
+              aria-required="true"
+              required
+            >
           </div>
-          <div class="face back">
-            <p class="tag">Tu amigo secreto es</p>
-            <p id="name"></p>
-            <p class="small">Shhh… ¡guarda el secreto! 🤫</p>
-          </div>
+          <p id="code-hint" class="field-hint">Código de 14 caracteres recibido en tu correo o invitación.</p>
+          <div id="code-error" class="field-error" role="alert" aria-live="polite" hidden></div>
+        </div>
+
+        <button type="submit" id="btn-submit" class="btn btn-primary">
+          <span class="btn-text">Descubrir amigo secreto</span>
+          <span class="btn-arrow" aria-hidden="true">→</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Estado de descifrado / carga -->
+    <div id="loading-card" class="card loading-card" role="status" aria-live="polite" hidden>
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <p class="loading-text">Descifrando tu amigo secreto…</p>
+    </div>
+
+    <!-- Tarjeta de revelación del amigo secreto -->
+    <section class="card result-card" id="result-card" role="region" aria-labelledby="result-title" hidden>
+      <div class="result-header">
+        <div id="result-badge" class="result-badge" aria-hidden="true">Pistas Confidenciales</div>
+        <h2 id="result-title" class="result-label" tabindex="-1">¿Quién será tu amigo secreto?</h2>
+        <p id="clues-progress" class="clues-progress" hidden></p>
+      </div>
+
+      <div id="name-container" class="name-container" hidden>
+        <div class="name-halo" aria-hidden="true"></div>
+        <div class="name-plaque">
+          <span id="revealed-name" class="revealed-name">Nombre</span>
         </div>
       </div>
-      <button id="replay" type="button" hidden>↻ Ver de nuevo</button>
+
+      <div id="clues-section" class="clues-section" hidden>
+        <h3 class="clues-title">Alias y características</h3>
+        <ul id="clues-list" class="clues-list" role="list"></ul>
+      </div>
+
+      <div id="clue-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+      <div class="result-footer">
+        <p id="secret-disclaimer" class="secret-disclaimer" hidden>
+          <span>Guarda el secreto hasta el día del intercambio.</span>
+        </p>
+
+        <div class="actions-group">
+          <button type="button" id="btn-next-clue" class="btn btn-primary" hidden>
+            <span id="btn-next-clue-text" class="btn-text">Siguiente característica</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </button>
+          <button type="button" id="btn-replay-clues" class="btn btn-ghost" hidden>
+            <span>Volver a ver las pistas paso a paso</span>
+          </button>
+          <button type="button" id="btn-reset" class="btn btn-secondary">
+            <span>Ingresar otro código</span>
+          </button>
+        </div>
+      </div>
     </section>
+
+    <!-- Lienzo para celebración sutil al revelar -->
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+    <footer class="app-footer">
+      <p>Cifrado seguro AES-256 GCM en el cliente. Nadie más puede ver tus resultados.</p>
+    </footer>
   </main>
-  <script src="app.js"></script>
+
+  <script src="app.js?v=11"></script>
 </body>
 </html>
